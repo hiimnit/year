@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import * as d3 from "d3";
 import {
   eachDayOfInterval,
@@ -6,7 +6,7 @@ import {
   lastDayOfYear,
   startOfYear,
 } from "date-fns";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { isBefore } from "date-fns/fp";
 import clsx from "clsx";
 
@@ -58,6 +58,15 @@ const height = 200;
 const width = 200;
 
 function Graph({ dates }: { dates: DatePoint[] }) {
+  const [selectedDate, setSeletedDate] = useState<Date | null>(null);
+  const formattedSelectedDate =
+    selectedDate === null
+      ? null
+      : new Intl.DateTimeFormat(undefined, {
+          dateStyle: "full",
+          timeStyle: undefined,
+        }).format(selectedDate);
+
   const xscale = d3
     .scaleLinear()
     .domain([0, 18])
@@ -76,7 +85,8 @@ function Graph({ dates }: { dates: DatePoint[] }) {
 
   const d = line(dates.filter(({ isBeforeToday }) => isBeforeToday));
 
-  const before = dates.filter((date) => date.isBeforeToday).length;
+  const dayOfyear = getDayOfYear(new Date());
+  const pathDuration = 0.4 + (dayOfyear / dates.length) * 5;
 
   return (
     <svg className="bg-slate-950" viewBox={`0 0 ${width} ${height}`}>
@@ -90,10 +100,10 @@ function Graph({ dates }: { dates: DatePoint[] }) {
         pathLength="1"
         initial={{ strokeDashoffset: 1 }}
         animate={{ strokeDashoffset: 0 }}
-        transition={{ duration: 4, ease: "easeOut", delay: 0.5 }}
+        transition={{ duration: pathDuration, ease: "easeOut", delay: 0.5 }}
       />
 
-      {dates.map(({ row, col, isBeforeToday }, i) => {
+      {dates.map(({ row, col, isBeforeToday, date }, i) => {
         return (
           <motion.circle
             key={i}
@@ -114,12 +124,43 @@ function Graph({ dates }: { dates: DatePoint[] }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: row * 0.1 }}
+            onPointerEnter={() => setSeletedDate(date)}
+            onPointerLeave={() => setSeletedDate(null)}
           />
         );
       })}
 
+      <AnimatePresence>
+        {formattedSelectedDate && (
+          <motion.g
+            key={formattedSelectedDate}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.1 }}
+          >
+            <rect
+              className="fill-slate-300"
+              width={`${formattedSelectedDate.length * 0.36}ex`}
+              height="0.4rem"
+              fill="currentColor"
+              y={height - 7.5}
+              x={margin.right - 2}
+            />
+            <text
+              className="fill-slate-700 font-mono text-[.3rem]"
+              y={height - 4}
+              x={margin.right - 1}
+              alignmentBaseline="middle"
+            >
+              {formattedSelectedDate}
+            </text>
+          </motion.g>
+        )}
+      </AnimatePresence>
+
       <motion.text
-        className="fill-slate-800 font-mono text-[.3rem]"
+        className="fill-slate-700 font-mono text-[.3rem]"
         y={height - margin.bottom}
         x={margin.right - 1}
         alignmentBaseline="middle"
@@ -127,7 +168,7 @@ function Graph({ dates }: { dates: DatePoint[] }) {
         animate={{ opacity: 1 }}
         transition={{ delay: 1.8 }}
       >
-        {before} / {dates.length}
+        {dayOfyear} / {dates.length}
       </motion.text>
     </svg>
   );
